@@ -1,0 +1,282 @@
+.app-navigation {
+  display: flex;
+  gap: 8px;
+  padding: 18px 32px;
+  background: white;
+  border-bottom: 1px solid #e5e9f0;
+}
+
+.app-navigation button {
+  background: transparent;
+  border-color: transparent;
+  color: #7b8496;
+}
+
+.app-navigation button.active {
+  background: #eeecff;
+  color: #635bff;
+}
+
+.documents-page {
+  max-width: 1440px;
+  margin: auto;
+  padding: 32px;
+}
+
+.documents-heading {
+  margin-bottom: 28px;
+}
+
+.documents-heading h1 {
+  margin-top: 12px;
+}
+
+.documents-layout {
+  display: grid;
+  grid-template-columns: 320px minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.documents-sidebar {
+  display: grid;
+  gap: 20px;
+}
+
+.upload-zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 25px 14px;
+  margin-top: 20px;
+  border: 1px dashed #bcb5f8;
+  border-radius: 12px;
+  background: #f8f7ff;
+  color: #6d65bf;
+  text-align: center;
+}
+
+.upload-symbol {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: #ebe8ff;
+  font-size: 25px;
+}
+
+.upload-zone > span:last-of-type {
+  font-size: 11px;
+  color: #8a86a5;
+}
+
+.upload-zone input[type="file"] {
+  max-width: 100%;
+  padding: 8px;
+  font-size: 11px;
+}
+
+.chosen-file {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f3f5fa;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.chosen-file span {
+  color: #8992a3;
+}
+
+.upload-submit {
+  width: 100%;
+  margin-top: 16px;
+}
+
+.document-item {
+  display: grid;
+  gap: 8px;
+  width: 100%;
+  padding: 15px;
+  margin-top: 12px;
+  background: white;
+  text-align: left;
+}
+
+.document-item.is-selected {
+  background: #f8f7ff;
+  border-color: #a69fff;
+}
+
+.document-item strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.document-item > span:not(.document-status) {
+  font-size: 10px;
+  color: #8a93a4;
+}
+
+.document-status {
+  display: inline-block;
+  justify-self: start;
+  align-self: start;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: #e8f7f0;
+  color: #208062;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.document-status.ocr {
+  background: #fff3dc;
+  color: #ad7b20;
+}
+
+.document-reader {
+  min-height: 650px;
+  padding: 30px;
+}
+
+.document-reader-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 20px;
+  border-bottom: 1px solid #edf0f5;
+  padding-bottom: 18px;
+}
+
+.document-reader-header h2 {
+  font-size: 20px;
+  overflow-wrap: anywhere;
+}
+
+.document-empty {
+  min-height: 570px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.document-empty p {
+  max-width: 360px;
+}
+
+.empty-document-icon {
+  font-size: 45px;
+  color: #9a91ef;
+}
+
+.intake-steps {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 25px;
+}
+
+.intake-steps span {
+  font-size: 11px;
+  padding: 10px;
+  border-radius: 8px;
+  color: #8a85a6;
+  background: #f5f3ff;
+}
+
+.extracted-pages {
+  display: grid;
+  gap: 20px;
+  margin-top: 24px;
+}
+
+.extracted-page {
+  padding: 24px;
+  border: 1px solid #e7eaf0;
+  border-radius: 12px;
+  background: #fcfcfe;
+}
+
+.page-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  color: #9b95bd;
+  margin-bottom: 18px;
+}
+
+.extracted-page pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1.9;
+  color: #535f74;
+}
+
+.ocr-message {
+  padding: 24px;
+  margin-top: 24px;
+  border: 1px solid #f1deb9;
+  border-radius: 12px;
+  background: #fffaf0;
+}
+
+.document-next-step {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 28px;
+  padding-top: 22px;
+  border-top: 1px solid #edf0f5;
+}
+
+.document-next-step strong {
+  font-size: 13px;
+}
+
+.document-next-step p {
+  max-width: 420px;
+  margin-bottom: 0;
+}
+
+.documents-error {
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border-radius: 10px;
+  background: #fff0f2;
+  border: 1px solid #f2cdd3;
+  color: #b23f53;
+  font-size: 13px;
+}
+
+@media (max-width: 850px) {
+  .documents-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .documents-page {
+    padding: 24px 16px;
+  }
+
+  .document-reader {
+    padding: 20px;
+  }
+
+  .document-reader-header {
+    flex-wrap: wrap;
+  }
+}
