@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useEffect, useImperativeHandle, useState } from "react";
+import type { Ref } from "react";
 import {
   ReactFlow,
   Background,
@@ -28,7 +29,7 @@ type Field = {
   requiredWhen?: Condition;
 };
 
-type FormDraft = {
+export type FormDraft = {
   title: string;
   description: string;
   fields: Field[];
@@ -81,8 +82,11 @@ async function request(path = "", options?: RequestInit) {
   return data;
 }
 
-export default function App() {
+export type BuilderHandle = { openDraft: (form: FormDraft) => boolean };
+
+export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
   const [draft, setDraft] = useState<FormDraft>(initial);
+  const [baseline, setBaseline] = useState(JSON.stringify(initial));
   const [formId, setFormId] = useState("");
   const [saved, setSaved] = useState<SavedForm[]>([]);
   const [selectedId, setSelectedId] = useState("frequencyHz");
@@ -90,6 +94,25 @@ export default function App() {
   const [values, setValues] = useState<Record<string, Value>>({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    openDraft(form) {
+      if (busy) {
+        window.alert("Wait for the current save or load to finish before opening a draft.");
+        return false;
+      }
+      if (JSON.stringify(draft) !== baseline &&
+          !window.confirm("Replace your unsaved builder edits with the generated form?")) return false;
+      setDraft(structuredClone(form));
+      setBaseline(""); // An imported draft is unsaved, even before further edits.
+      setFormId("");
+      setSelectedId(form.fields[0]?.id ?? "");
+      setValues({});
+      setTab("Builder");
+      setMessage("Generated draft opened. Review it, then save when ready.");
+      return true;
+    },
+  }));
 
   const selected = draft.fields.find((field) => field.id === selectedId);
 
@@ -161,6 +184,7 @@ export default function App() {
       });
 
       setFormId(result._id);
+      setBaseline(JSON.stringify(draft));
       setSaved(await request());
       setMessage("Form saved successfully.");
     } catch (error) {
@@ -183,6 +207,7 @@ export default function App() {
         fields: result.fields,
       });
       setFormId(result._id);
+      setBaseline(JSON.stringify({ title: result.title, description: result.description, fields: result.fields }));
       setSelectedId(result.fields[0]?.id || "");
       setValues({});
       setMessage("Saved form loaded.");

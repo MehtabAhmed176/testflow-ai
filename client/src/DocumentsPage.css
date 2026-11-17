@@ -263,6 +263,24 @@
   font-size: 13px;
 }
 
+.generated-draft {
+  margin-top: 24px;
+  padding: 24px;
+  border: 1px solid #e7eaf0;
+  border-radius: 12px;
+  background: #fcfcfe;
+}
+
+.generated-draft details { margin: 18px 0; }
+.generated-draft summary { cursor: pointer; }
+.generated-draft pre {
+  max-height: 400px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
 @media (max-width: 850px) {
   .documents-layout {
     grid-template-columns: 1fr;

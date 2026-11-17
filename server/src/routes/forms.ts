@@ -10,7 +10,7 @@ const conditionSchema = z.object({
   equals: z.union([z.string(), z.number(), z.boolean()]),
 }).strict();
 
-const fieldSchema = z.object({
+export  const fieldSchema = z.object({
   id: z.string().trim().min(1),
   label: z.string().trim().min(1),
   type: z.enum(["text", "number", "boolean", "select", "textarea"]),
@@ -23,7 +23,7 @@ const fieldSchema = z.object({
   requiredWhen: conditionSchema.optional(),
 }).strict();
 
-const formInputSchema = z.object({
+export const formInputSchema = z.object({
   title: z.string().trim().min(1).max(200),
   description: z.string().max(5000).default(""),
   fields: z.array(fieldSchema).max(200).default([]),

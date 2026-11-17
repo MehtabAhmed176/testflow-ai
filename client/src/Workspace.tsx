@@ -1,9 +1,11 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import App from "./App";
+import type { BuilderHandle } from "./App";
 import DocumentsPage from "./DocumentsPage";
 
 export default function Workspace() {
   const [page, setPage] = useState<"documents" | "builder">("documents");
+  const builder = useRef<BuilderHandle>(null);
 
   return (
     <>
@@ -24,11 +26,13 @@ export default function Workspace() {
       </nav>
 
       <div hidden={page !== "documents"}>
-        <DocumentsPage />
+        <DocumentsPage onOpenDraft={(form) => {
+          if (builder.current?.openDraft(form)) setPage("builder");
+        }} />
       </div>
 
       <div hidden={page !== "builder"}>
-        <App />
+        <App ref={builder} />
       </div>
     </>
   );

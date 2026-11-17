@@ -1,0 +1,163 @@
+{
+  "title": "Sensor vibration and temperature test request",
+  "description": 'Complete one entry for each of the five S-100 electronic sensor samples. Each physical unit needs a unique sample ID, and the same ID must be used across all requested tests. Vibration testing runs for two hours per sample. Temperature-test duration and time at each temperature are unresolved and must be confirmed by the customer. The pass or fail criteria and the permitted supply-voltage range are also outstanding.',
+  fields: [
+    {
+      id: 'sampleId',
+      label: 'Sample ID',
+      type: 'text',
+      required: true,
+      helpText: 'Must be unique for each physical unit and consistent across all requested tests.'
+    },
+    {
+      id: 'componentModel',
+      label: 'Component model',
+      type: 'text',
+      required: true
+    },
+    {
+      id: 'hardwareRevision',
+      label: 'Hardware revision',
+      type: 'text',
+      required: true
+    },
+    {
+      id: 'additionalComments',
+      label: 'Additional comments',
+      type: 'textarea',
+      required: false
+    },
+    {
+      id: 'vibrationFrequencyHz',
+      label: 'Vibration frequency (Hz)',
+      type: 'number',
+      required: true,
+      min: 10,
+      max: 500,
+      helpText: 'Vibration testing runs for two hours per sample.'
+    },
+    {
+      id: 'mountingDirection',
+      label: 'Mounting direction',
+      type: 'select',
+      required: true,
+      options: [Array]
+    },
+    {
+      id: 'preTestPhotographsRequired',
+      label: 'Are pre-test photographs required?',
+      type: 'boolean',
+      required: true
+    },
+    {
+      id: 'photographReference',
+      label: 'Photograph file reference',
+      type: 'text',
+      required: true,
+      visibleWhen: [Object],
+      requiredWhen: [Object]
+    },
+    {
+      id: 'temperatureTestRequested',
+      label: 'Is optional temperature testing requested?',
+      type: 'boolean',
+      required: true
+    },
+    {
+      id: 'minTemperatureC',
+      label: 'Minimum temperature (°C)',
+      type: 'number',
+      required: true,
+      min: -20,
+      max: 80,
+      helpText: 'Must be lower than the maximum temperature.',
+      visibleWhen: [Object],
+      requiredWhen: [Object]
+    },
+    {
+      id: 'maxTemperatureC',
+      label: 'Maximum temperature (°C)',
+      type: 'number',
+      required: true,
+      min: -20,
+      max: 80,
+      helpText: 'Must be higher than the minimum temperature.',
+      visibleWhen: [Object],
+      requiredWhen: [Object]
+    },
+    {
+      id: 'temperatureTestMode',
+      label: 'Temperature test mode',
+      type: 'select',
+      required: true,
+      options: [Array],
+      visibleWhen: [Object],
+      requiredWhen: [Object]
+    },
+    {
+      id: 'temperatureCycleCount',
+      label: 'Number of temperature cycles',
+      type: 'number',
+      integer: true,
+      required: true,
+      min: 1,
+      max: 50,
+      visibleWhen: [Object],
+      requiredWhen: [Object]
+    },
+    {
+      id: 'temperatureTimingNotes',
+      label: 'Temperature-test duration and time at each temperature (to be confirmed)',
+      type: 'textarea',
+      required: false,
+      helpText: 'Not yet agreed. Customer to confirm these values.',
+      visibleWhen: [Object]
+    },
+    {
+      id: 'poweredOperation',
+      label: 'Will the sensor be powered during testing?',
+      type: 'boolean',
+      required: true
+    },
+    {
+      id: 'supplyVoltageV',
+      label: 'Supply voltage (V)',
+      type: 'number',
+      required: true,
+      helpText: 'Permitted voltage range is not yet confirmed.',
+      visibleWhen: [Object],
+      requiredWhen: [Object]
+    },
+    {
+      id: 'currentMonitoringRequired',
+      label: 'Is current monitoring required?',
+      type: 'boolean',
+      required: true,
+      visibleWhen: [Object],
+      requiredWhen: [Object]
+    },
+    {
+      id: 'currentSamplingIntervalMs',
+      label: 'Current sampling interval (ms)',
+      type: 'number',
+      required: true,
+      min: 100,
+      max: 1000,
+      visibleWhen: [Object],
+      requiredWhen: [Object]
+    },
+    {
+      id: 'specialHandlingInstructions',
+      label: 'Special handling instructions',
+      type: 'textarea',
+      required: false
+    },
+    {
+      id: 'passFailCriteriaConfirmed',
+      label: 'Customer confirms the pass or fail criteria before approval',
+      type: 'boolean',
+      required: true,
+      helpText: 'Pass or fail criteria have not been approved yet.'
+    }
+  ]
+}

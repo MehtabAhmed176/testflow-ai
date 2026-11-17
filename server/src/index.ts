@@ -5,6 +5,7 @@ import mongoose from "mongoose";
 import type { ErrorRequestHandler } from "express";
 import { formsRouter } from "./routes/forms.js";
 import { documentsRouter } from "./routes/documents.js";
+import { extractionRouter } from "./routes/extraction.js";
 
 const app = express();
 const port = Number(process.env.PORT || 4000);
@@ -26,8 +27,6 @@ const errorHandler: ErrorRequestHandler = (error, _req, res, _next) => {
   });
 };
 
-app.use(errorHandler);
-
 app.use(express.json({ limit: "1mb" }));
 
 app.get("/api/health", (_req, res) => {
@@ -41,7 +40,8 @@ app.get("/api/health", (_req, res) => {
 // Api routes
 app.use("/api/forms", formsRouter);
 app.use("/api/documents", documentsRouter);
-
+app.use("/api/documents", extractionRouter);
+app.use(errorHandler);
 
 async function start() {
   if (!mongoUri) {
