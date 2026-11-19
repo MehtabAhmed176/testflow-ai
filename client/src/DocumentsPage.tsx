@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import "./DocumentsPage.css";
-import type { FormDraft } from "./App";
+import { apiRequest } from "./api";
+import type { FormDraft, SavedDraft } from "./App";
 
-const API = "http://localhost:4000/api/documents";
+
 
 type DocumentSummary = {
   _id: string;
@@ -20,30 +21,8 @@ type CustomerDocument = DocumentSummary & {
   }[];
 };
 
-async function request<T>(
-  path = "",
-  options?: RequestInit,
-): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(`${API}${path}`, options);
-  } catch {
-    throw new Error("Could not reach the document API at localhost:4000. Check that the backend is running, then try again.");
-  }
-  const data = await response.json().catch(() => null);
-
-  if (!response.ok) {
-    const details = Array.isArray(data?.errors)
-      ? data.errors.map((issue: { message?: string; path?: (string | number)[] }) =>
-          `${issue.path?.length ? `${issue.path.join(".")}: ` : ""}${issue.message || "Validation failed"}`,
-        ).join("; ")
-      : "";
-    throw new Error([data?.message, details].filter(Boolean).join(": ") ||
-      `Request failed (${response.status}). Please try again.`);
-  }
-
-  if (data === null) throw new Error("The document API returned an invalid JSON response. Please try again.");
-  return data as T;
+async function request<T>(path = "", options?: RequestInit): Promise<T> {
+  return apiRequest<T>(`/documents${path}`, options);
 }
 
 function statusLabel(status: DocumentSummary["status"]) {
@@ -52,8 +31,11 @@ function statusLabel(status: DocumentSummary["status"]) {
     : "OCR needed";
 }
 
-export default function DocumentsPage({ onOpenDraft }: {
-  onOpenDraft: (form: FormDraft) => void;
+export default function DocumentsPage({ canAccept, onAccepted, onReopen, onAcceptanceBusy }: {
+  canAccept: () => boolean;
+  onAccepted: (form: SavedDraft) => void;
+  onReopen: (id: string) => Promise<void>;
+  onAcceptanceBusy: (busy: boolean) => void;
 }) {
   const [documents, setDocuments] = useState<DocumentSummary[]>([]);
   const [selected, setSelected] = useState<CustomerDocument | null>(null);
@@ -66,6 +48,9 @@ export default function DocumentsPage({ onOpenDraft }: {
   const [generated, setGenerated] = useState<FormDraft | null>(null);
   const [extracting, setExtracting] = useState(false);
   const extractionInFlight = useRef(false);
+  const [accepting, setAccepting] = useState(false);
+  const acceptanceInFlight = useRef(false);
+  const [accepted, setAccepted] = useState<SavedDraft | null>(null);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const selectionRequest = useRef(0);
@@ -96,8 +81,9 @@ export default function DocumentsPage({ onOpenDraft }: {
   }, []);
 
   async function openDocument(id: string) {
-    if (extractionInFlight.current) return;
+    if (extractionInFlight.current || acceptanceInFlight.current) return;
     setGenerated(null);
+    setAccepted(null);
     const requestId = ++selectionRequest.current;
 
     setLoading(true);
@@ -128,7 +114,7 @@ export default function DocumentsPage({ onOpenDraft }: {
 
   async function uploadDocument(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (extractionInFlight.current || uploading) return;
+    if (extractionInFlight.current || acceptanceInFlight.current || uploading) return;
     setError("");
     setMessage("");
 
@@ -163,6 +149,7 @@ export default function DocumentsPage({ onOpenDraft }: {
 
       setSelected(document);
       setGenerated(null);
+      setAccepted(null);
       setDocuments((current) => [
         document,
         ...current.filter((item) => item._id !== document._id),
@@ -187,7 +174,7 @@ export default function DocumentsPage({ onOpenDraft }: {
 
   async function generateForm() {
     if (!selected || selected.status !== "text_extracted" ||
-        uploading || loading || extractionInFlight.current) return;
+        uploading || loading || extractionInFlight.current || acceptanceInFlight.current) return;
     extractionInFlight.current = true;
     setExtracting(true);
     setError("");
@@ -195,11 +182,37 @@ export default function DocumentsPage({ onOpenDraft }: {
     try {
       const form = await request<FormDraft>(`/${selected._id}/extract-form`, { method: "POST" });
       setGenerated(form);
+      setAccepted(null);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not generate a form. Please try again.");
     } finally {
       extractionInFlight.current = false;
       setExtracting(false);
+    }
+  }
+
+  async function acceptForm() {
+    if (!selected || !generated || extractionInFlight.current || acceptanceInFlight.current) return;
+    if (accepted) { await onReopen(accepted._id); return; }
+    if (!canAccept()) return;
+    acceptanceInFlight.current = true;
+    setAccepting(true);
+    onAcceptanceBusy(true);
+    setError("");
+    try {
+      const saved = await request<SavedDraft>(`/${selected._id}/accept-form`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ form: generated }),
+      });
+      setAccepted(saved);
+      onAccepted(saved);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not accept this form.");
+    } finally {
+      acceptanceInFlight.current = false;
+      setAccepting(false);
+      onAcceptanceBusy(false);
     }
   }
 
@@ -244,7 +257,7 @@ export default function DocumentsPage({ onOpenDraft }: {
                 ref={fileInput}
                 type="file"
                 accept=".pdf,application/pdf"
-                disabled={uploading || extracting}
+                disabled={uploading || extracting || accepting}
                 onChange={(event) => {
                   setFile(event.target.files?.[0] ?? null);
                   setError("");
@@ -263,7 +276,7 @@ export default function DocumentsPage({ onOpenDraft }: {
             <button
               className="primary upload-submit"
               type="submit"
-              disabled={!file || uploading || extracting}
+              disabled={!file || uploading || extracting || accepting}
             >
               {uploading ? "Uploading and extracting…" : "Upload document"}
             </button>
@@ -283,7 +296,7 @@ export default function DocumentsPage({ onOpenDraft }: {
               <button
                 type="button"
                 key={document._id}
-                disabled={uploading || extracting}
+                disabled={uploading || extracting || accepting}
                 className={`document-item ${
                   selected?._id === document._id ? "is-selected" : ""
                 }`}
@@ -383,7 +396,7 @@ export default function DocumentsPage({ onOpenDraft }: {
                   </p>
                 </div>
                 <button type="button"
-                  disabled={selected.status !== "text_extracted" || extracting || uploading || loading}
+                  disabled={selected.status !== "text_extracted" || extracting || uploading || loading || accepting}
                   onClick={() => void generateForm()}>
                   {extracting ? "Generating form draft…" : "Generate form draft"}
                 </button>
@@ -391,15 +404,15 @@ export default function DocumentsPage({ onOpenDraft }: {
               {extracting && <p role="status">Generating a draft. Document selection is locked until extraction finishes.</p>}
               {generated && (
                 <section className="generated-draft" aria-label="Generated form draft">
-                  <div className="eyebrow">GENERATED DRAFT · UNSAVED</div>
+                  <div className="eyebrow">GENERATED DRAFT · {accepted ? "SAVED" : "UNSAVED"}</div>
                   <h3>{generated.title}</h3>
-                  <p>{generated.fields.length} field(s). Review and edit in the builder before saving.</p>
+                  <p>{generated.fields.length} field(s). {accepted ? "Accepted draft saved and linked to this document." : "Accept to save a draft linked to this document."}</p>
                   <details>
                     <summary>View form JSON</summary>
                     <pre>{JSON.stringify(generated, null, 2)}</pre>
                   </details>
-                  <button type="button" className="primary" disabled={extracting || uploading}
-                    onClick={() => onOpenDraft(generated)}>Open in builder</button>
+                  <button type="button" className="primary" disabled={extracting || uploading || accepting}
+                    onClick={() => void acceptForm()}>{accepting ? "Accepting…" : accepted ? "Open saved draft" : "Accept and open in builder"}</button>
                 </section>
               )}
             </>

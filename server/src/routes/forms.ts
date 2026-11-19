@@ -154,12 +154,12 @@ formsRouter.post("/", async (req, res, next) => {
 formsRouter.get("/", async (_req, res, next) => {
   try {
     const forms = await Form.find()
-      .select("title description status createdAt updatedAt")
+      .select("title description status sourceDocumentId revision createdAt updatedAt")
       .sort({ updatedAt: -1 })
       .limit(100)
       .lean();
 
-    res.json(forms);
+    res.json(forms.map((form) => ({ ...form, revision: form.revision ?? 0 })));
   } catch (error) {
     next(error);
   }
@@ -175,7 +175,7 @@ formsRouter.get("/:id", async (req, res, next) => {
       return;
     }
 
-    res.json(form);
+    res.json({ ...form, revision: form.revision ?? 0 });
   } catch (error) {
     next(error);
   }
@@ -184,21 +184,33 @@ formsRouter.get("/:id", async (req, res, next) => {
 // Replace the editable draft content.
 formsRouter.put("/:id", async (req, res, next) => {
   try {
-    const parsed = formInputSchema.safeParse(req.body);
+    const envelope = z.object({
+      form: formInputSchema,
+      expectedRevision: z.number().int().min(0),
+    }).strict().safeParse(req.body);
 
-    if (!parsed.success) {
-      res.status(400).json({ errors: parsed.error.issues });
+    if (!envelope.success) {
+      res.status(400).json({ errors: envelope.error.issues });
       return;
     }
 
-    const form = await Form.findByIdAndUpdate(
-      req.params.id,
-      { $set: parsed.data },
-      { new: true, runValidators: true },
+    const { form: editable, expectedRevision } = envelope.data;
+    // Legacy documents expose revision 0 until their first successful update.
+    const revisionFilter = expectedRevision === 0
+      ? { $or: [{ revision: { $exists: false } }, { revision: 0 }] }
+      : { revision: expectedRevision };
+    const form = await Form.findOneAndUpdate(
+      { _id: req.params.id, ...revisionFilter },
+      { $set: editable, $inc: { revision: 1 } },
+      { returnDocument: "after", runValidators: true },
     );
 
     if (!form) {
-      res.status(404).json({ message: "Form not found" });
+      if (await Form.exists({ _id: req.params.id })) {
+        res.status(409).json({ message: "This form was changed elsewhere. Your edits have not been saved. Reload the saved form before trying again." });
+      } else {
+        res.status(404).json({ message: "Form not found" });
+      }
       return;
     }
 

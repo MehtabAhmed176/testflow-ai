@@ -1,5 +1,9 @@
-import { useEffect, useImperativeHandle, useState } from "react";
-import type { Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState } from "react";
+import type { Ref, SetStateAction } from "react";
+import { RequirementsAssistant } from "./RequirementsAssistant";
+import { apiRequest } from "./api";
+import { formFingerprint } from "./formChat";
+import { ChevronDown, ChevronUp, GitBranch, Info, Plus, Save, Sparkles } from "lucide-react";
 import {
   ReactFlow,
   Background,
@@ -10,13 +14,13 @@ import {
 import "@xyflow/react/dist/style.css";
 import "./App.css";
 
-const API = "http://localhost:4000/api/forms";
+
 
 type FieldType = "text" | "textarea" | "number" | "boolean" | "select";
 type Value = string | number | boolean;
 type Condition = { fieldId: string; equals: Value };
 
-type Field = {
+export type Field = {
   id: string;
   label: string;
   type: FieldType;
@@ -36,6 +40,7 @@ export type FormDraft = {
 };
 
 type SavedForm = { _id: string; title: string };
+export type SavedDraft = FormDraft & { _id: string; sourceDocumentId?: string; revision: number };
 
 const initial: FormDraft = {
   title: "Sensor qualification",
@@ -67,24 +72,22 @@ const initial: FormDraft = {
   ],
 };
 
-async function request(path = "", options?: RequestInit) {
-  const response = await fetch(`${API}${path}`, options);
-  const data = await response.json();
-
-  if (!response.ok) {
-    throw new Error(
-      data.errors
-        ?.map((issue: { message: string }) => issue.message)
-        .join(" · ") || data.message || "Request failed",
-    );
-  }
-
-  return data;
+async function request<T = SavedDraft>(path = "", options?: RequestInit) {
+  return apiRequest<T>(`/forms${path}`, options);
 }
 
-export type BuilderHandle = { openDraft: (form: FormDraft) => boolean };
+export type BuilderHandle = {
+  canReplace: () => boolean;
+  openSaved: (form: SavedDraft) => void;
+  loadSaved: (id: string) => Promise<boolean>;
+  openNew: () => boolean;
+};
 
-export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
+export default function App({ ref, onSaved, onBusyChange }: {
+  ref?: Ref<BuilderHandle>;
+  onSaved: (id: string) => void;
+  onBusyChange: (busy: boolean) => void;
+}) {
   const [draft, setDraft] = useState<FormDraft>(initial);
   const [baseline, setBaseline] = useState(JSON.stringify(initial));
   const [formId, setFormId] = useState("");
@@ -93,37 +96,81 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
   const [tab, setTab] = useState("Builder");
   const [values, setValues] = useState<Record<string, Value>>({});
   const [message, setMessage] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusyState] = useState(false);
+  const [revision, setRevision] = useState(0);
+  const [paletteOpen, setPaletteOpen] = useState(true);
+  const [contextId, setContextId] = useState("frequencyHz");
+  const [assistantOpen, setAssistantOpen] = useState(true);
+  const [serverRevision, setServerRevision] = useState(0);
+  const [sourceDocumentId, setSourceDocumentId] = useState<string>();
+  const operation = useRef(false);
+  const [loadFailed, setLoadFailed] = useState(false);
 
-  useImperativeHandle(ref, () => ({
-    openDraft(form) {
-      if (busy) {
-        window.alert("Wait for the current save or load to finish before opening a draft.");
-        return false;
-      }
-      if (JSON.stringify(draft) !== baseline &&
-          !window.confirm("Replace your unsaved builder edits with the generated form?")) return false;
-      setDraft(structuredClone(form));
-      setBaseline(""); // An imported draft is unsaved, even before further edits.
-      setFormId("");
-      setSelectedId(form.fields[0]?.id ?? "");
-      setValues({});
-      setTab("Builder");
-      setMessage("Generated draft opened. Review it, then save when ready.");
-      return true;
-    },
-  }));
+  function setBusy(value: boolean) {
+    setBusyState(value);
+    onBusyChange(value);
+  }
+
+  function changeDraft(update: SetStateAction<FormDraft>) {
+    setDraft(update);
+    setRevision((value) => value + 1);
+  }
+
+  function explainField(id: string) {
+    setContextId(id);
+    setAssistantOpen(true);
+  }
+
+  function canReplace() {
+    return !operation.current && (JSON.stringify(draft) === baseline ||
+      window.confirm("Replace your unsaved builder edits with another saved form?"));
+  }
+
+  function openSaved(form: SavedDraft) {
+    setLoadFailed(false);
+    const editable = { title: form.title, description: form.description, fields: form.fields };
+    changeDraft(editable);
+    setBaseline(JSON.stringify(editable));
+    setFormId(form._id);
+    setServerRevision(form.revision ?? 0);
+    setSourceDocumentId(form.sourceDocumentId);
+    setSelectedId(form.fields[0]?.id ?? "");
+    setContextId(form.fields[0]?.id ?? "");
+    setValues({});
+    setTab("Builder");
+    setSaved((current) => [form, ...current.filter((item) => item._id !== form._id)]);
+    setMessage("Saved draft opened.");
+  }
+
+  function openNew() {
+    if (!canReplace()) return false;
+    changeDraft(structuredClone(initial));
+    setBaseline(JSON.stringify(initial));
+    setFormId("");
+    setSourceDocumentId(undefined);
+    setServerRevision(0);
+    setLoadFailed(false);
+    setValues({});
+    setSelectedId(initial.fields[0]?.id ?? "");
+    setContextId(initial.fields[0]?.id ?? "");
+    setTab("Builder");
+    setMessage("New manual draft. Save when ready.");
+    onSaved("new");
+    return true;
+  }
+
+  useImperativeHandle(ref, () => ({ canReplace, openSaved, loadSaved: load, openNew }));
 
   const selected = draft.fields.find((field) => field.id === selectedId);
 
   useEffect(() => {
-    request()
+    request<SavedForm[]>()
       .then(setSaved)
       .catch((error: Error) => setMessage(error.message));
   }, []);
 
   function updateField(id: string, patch: Partial<Field>) {
-    setDraft((current) => ({
+    changeDraft((current) => ({
       ...current,
       fields: current.fields.map((field) =>
         field.id === id ? { ...field, ...patch } : field,
@@ -141,11 +188,12 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
       ...(type === "select" ? { options: ["Option A", "Option B"] } : {}),
     };
 
-    setDraft((current) => ({
+    changeDraft((current) => ({
       ...current,
       fields: [...current.fields, field],
     }));
     setSelectedId(id);
+    setContextId(id);
     setTab("Builder");
     setMessage("");
   }
@@ -164,7 +212,7 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
       return;
     }
 
-    setDraft((current) => ({
+    changeDraft((current) => ({
       ...current,
       fields: current.fields.filter((field) => field.id !== id),
     }));
@@ -173,6 +221,8 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
   }
 
   async function save() {
+    if (operation.current || loadFailed) return;
+    operation.current = true;
     setBusy(true);
     setMessage("");
 
@@ -180,40 +230,41 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
       const result = await request(formId ? `/${formId}` : "", {
         method: formId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(draft),
+        body: JSON.stringify(formId ? { form: draft, expectedRevision: serverRevision } : draft),
       });
 
       setFormId(result._id);
+      setServerRevision(result.revision);
+      setSourceDocumentId(result.sourceDocumentId);
       setBaseline(JSON.stringify(draft));
-      setSaved(await request());
+      setSaved((current) => [result, ...current.filter((item) => item._id !== result._id)]);
+      onSaved(result._id);
       setMessage("Form saved successfully.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Save failed");
     } finally {
+      operation.current = false;
       setBusy(false);
     }
   }
 
   async function load(id: string) {
-    if (!id) return;
+    if (!id || operation.current || !canReplace()) return false;
+    operation.current = true;
     setBusy(true);
 
     try {
       const result = await request(`/${id}`);
 
-      setDraft({
-        title: result.title,
-        description: result.description,
-        fields: result.fields,
-      });
-      setFormId(result._id);
-      setBaseline(JSON.stringify({ title: result.title, description: result.description, fields: result.fields }));
-      setSelectedId(result.fields[0]?.id || "");
-      setValues({});
-      setMessage("Saved form loaded.");
+      openSaved(result);
+      onSaved(result._id);
+      return true;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Load failed");
+      setLoadFailed(true);
+      return false;
     } finally {
+      operation.current = false;
       setBusy(false);
     }
   }
@@ -238,7 +289,7 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
       borderRadius: 12,
       padding: 16,
       width: 230,
-      border: "1px solid #c7d2fe",
+      border: field.id === selectedId || draft.fields.some((target) => target.id === selectedId && (target.visibleWhen?.fieldId === field.id || target.requiredWhen?.fieldId === field.id)) ? "2px solid #7c3aed" : "1px solid #c7d2fe",
       background: "#fff",
     },
   }));
@@ -288,7 +339,10 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
               </option>
             ))}
           </select>
-          <button className="primary" disabled={busy} onClick={save}>
+          <button type="button" disabled={busy} onClick={openNew}>New form</button>
+          {formId && <button type="button" disabled={busy} onClick={() => void load(formId)}>Reload saved</button>}
+          <button className="primary" disabled={busy || loadFailed} onClick={save}>
+            <Save size={15} />
             {busy ? "Please wait…" : "Save draft"}
           </button>
         </div>
@@ -297,14 +351,36 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
       <section className="heading">
         <div>
           <div className="eyebrow">WORKSPACE / TEST REQUESTS</div>
-          <h1>Build a better test request.</h1>
-          <p>Design fields, connect rules, and preview the experience.</p>
+          <h1>Design with clarity.</h1>
+          <p>Every field has a purpose. Every change stays in your control.</p>
         </div>
-        <span className="badge">Draft</span>
+        <span className="badge" role="status">{busy ? "Saving / loading…" : !formId ? "Unsaved draft" : JSON.stringify(draft) !== baseline ? "Unsaved changes" : "Form saved"}</span>
       </section>
+      {formId && <p>Revision {serverRevision}{serverRevision === 0 && " (legacy — upgraded on next save)"}
+        {sourceDocumentId ? ` · Source document: ${sourceDocumentId}` : " · Manual form"}</p>}
 
       {message && <div className="notice" role="status">{message}</div>}
 
+      <fieldset disabled={busy} className="draft-controls">
+      <main className="workspace">
+        <aside className="panel palette"><button type="button" className="palette-toggle" aria-expanded={paletteOpen} onClick={() => setPaletteOpen(!paletteOpen)}>Add controls {paletteOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button><div hidden={!paletteOpen}>
+
+          {(["text", "textarea", "number", "boolean", "select"] as const).map(
+            (type) => (
+              <button
+                className="control-button"
+                key={type}
+                onClick={() => addField(type)}
+              >
+                <span>{type === "boolean" ? "☑" : type === "number" ? "#" : "T"}</span>
+                {type === "boolean" ? "Checkbox" : type}
+                <Plus size={14} className="plus" />
+              </button>
+            ),
+          )}
+        </div></aside>
+
+        <section className="canvas">
       <nav className="tabs">
         {["Builder", "Live preview", "Dependencies"].map((name) => (
           <button
@@ -316,29 +392,6 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
           </button>
         ))}
       </nav>
-
-      <main className="workspace">
-        <aside className="panel palette">
-          <div className="eyebrow">FORM CONTROLS</div>
-          <h3>Add a field</h3>
-          <p>Choose a control to add it to your form.</p>
-
-          {(["text", "textarea", "number", "boolean", "select"] as const).map(
-            (type) => (
-              <button
-                className="control-button"
-                key={type}
-                onClick={() => addField(type)}
-              >
-                <span>{type === "boolean" ? "☑" : type === "number" ? "#" : "T"}</span>
-                {type === "boolean" ? "Checkbox" : type}
-                <span className="plus">+</span>
-              </button>
-            ),
-          )}
-        </aside>
-
-        <section className="canvas">
           {tab === "Builder" && (
             <div className="form-sheet">
               <div className="eyebrow">FORM DETAILS</div>
@@ -346,154 +399,38 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
                 className="title-input"
                 aria-label="Form title"
                 value={draft.title}
-                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                onChange={(e) => changeDraft({ ...draft, title: e.target.value })}
               />
               <textarea
                 className="description-input"
                 aria-label="Form description"
                 value={draft.description}
                 onChange={(e) =>
-                  setDraft({ ...draft, description: e.target.value })
+                  changeDraft({ ...draft, description: e.target.value })
                 }
               />
 
               <div className="field-list">
                 {draft.fields.map((field, index) => (
-                  <button
-                    key={field.id}
-                    className={`field-card ${selectedId === field.id ? "selected" : ""}`}
-                    onClick={() => setSelectedId(field.id)}
-                  >
-                    <div className="field-number">{index + 1}</div>
-                    <div className="field-summary">
-                      <strong>{field.label || "Untitled field"}</strong>
-                      <small>
-                        {field.type}
-                        {field.unit && ` · ${field.unit}`}
-                        {field.required && " · Required"}
-                      </small>
-                      {(field.visibleWhen || field.requiredWhen) && (
-                        <span className="rule-tag">Conditional rules</span>
-                      )}
+                  <article key={field.id} className={`field-card ${selectedId === field.id ? "selected" : ""}`}>
+                    <div className="field-card-heading">
+                      <button type="button" className="field-select" aria-expanded={selectedId === field.id}
+                        aria-controls={`editor-${field.id}`} onClick={() => {
+                          const next = selectedId === field.id ? "" : field.id;
+                          setSelectedId(next); setContextId(next);
+                        }}>
+                        <span className="field-number">{index + 1}</span>
+                        <span className="field-summary"><strong>{field.label || "Untitled field"}</strong>
+                          <small>{field.type}{field.unit && ` · ${field.unit}`}{field.required && " · Required"}</small>
+                        </span>
+                        {selectedId === field.id ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      </button>
+                      <div className="field-actions">
+                        <button type="button" onClick={() => explainField(field.id)}><Info size={14} />Why this field?</button>
+                        <button type="button" onClick={() => { setSelectedId(field.id); setContextId(field.id); setTab("Dependencies"); }}><GitBranch size={14} />Dependencies</button>
+                      </div>
                     </div>
-                    <span className="edit-label">Edit →</span>
-                  </button>
-                ))}
-                {!draft.fields.length && (
-                  <p>Add your first field using the controls on the left.</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {tab === "Live preview" && (
-            <form
-              className="form-sheet preview"
-              onSubmit={(event) => {
-                event.preventDefault();
-                setMessage("Preview validation passed. No test answers were saved.");
-              }}
-            >
-              <div className="eyebrow">CUSTOMER VIEW</div>
-              <h2>{draft.title}</h2>
-              <p>{draft.description}</p>
-
-              {draft.fields.map((field) => {
-                if (field.visibleWhen && !matches(field.visibleWhen)) return null;
-
-                const required =
-                  field.required ||
-                  Boolean(field.requiredWhen && matches(field.requiredWhen));
-
-                const setValue = (value: Value) =>
-                  setValues((current) => ({ ...current, [field.id]: value }));
-
-                return (
-                  <div className="preview-field" key={field.id}>
-                    <label htmlFor={field.id}>
-                      {field.label} {required && <span className="required">*</span>}
-                      {field.unit && <small> ({field.unit})</small>}
-                    </label>
-
-                    {field.type === "boolean" ? (
-                      <input
-                        id={field.id}
-                        type="checkbox"
-                        checked={values[field.id] === true}
-                        required={required}
-                        onChange={(e) => setValue(e.target.checked)}
-                      />
-                    ) : field.type === "textarea" ? (
-                      <textarea
-                        id={field.id}
-                        required={required}
-                        value={String(values[field.id] ?? "")}
-                        onChange={(e) => setValue(e.target.value)}
-                      />
-                    ) : field.type === "select" ? (
-                      <select
-                        id={field.id}
-                        required={required}
-                        value={String(values[field.id] ?? "")}
-                        onChange={(e) => setValue(e.target.value)}
-                      >
-                        <option value="">Choose an option</option>
-                        {field.options?.map((option) => (
-                          <option key={option} value={option}>{option}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input
-                        id={field.id}
-                        type={field.type}
-                        step={field.type === "number" ? "any" : undefined}
-                        min={field.min}
-                        max={field.max}
-                        required={required}
-                        value={String(values[field.id] ?? "")}
-                        onChange={(e) =>
-                          setValue(
-                            field.type === "number" && e.target.value !== ""
-                              ? Number(e.target.value)
-                              : e.target.value,
-                          )
-                        }
-                      />
-                    )}
-                    {field.type === "number" && (
-                      <small>
-                        Allowed range: {field.min ?? "No minimum"} – {field.max ?? "No maximum"}
-                      </small>
-                    )}
-                  </div>
-                );
-              })}
-              <button className="primary" type="submit">Validate preview</button>
-            </form>
-          )}
-
-          {tab === "Dependencies" && (
-            <div className="graph">
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                fitView
-                nodesDraggable={false}
-                nodesConnectable={false}
-                onNodeClick={(_event, node) => setSelectedId(node.id)}
-              >
-                <Background />
-                <Controls />
-              </ReactFlow>
-            </div>
-          )}
-        </section>
-
-        <aside className="panel properties">
-          <div className="eyebrow">FIELD SETTINGS</div>
-          <h3>{selected ? "Make it yours" : "Select a field"}</h3>
-
-          {selected ? (
+                    {selectedId === field.id && selected && <div id={`editor-${field.id}`} className="properties inline-editor">
             <>
               <label>
                 Label
@@ -666,11 +603,135 @@ export default function App({ ref }: { ref?: Ref<BuilderHandle> }) {
                 Remove field
               </button>
             </>
-          ) : (
-            <p>Choose a field on the canvas to configure its properties.</p>
+                      <div className="source-unavailable">Source evidence not available yet</div>
+                    </div>}
+                  </article>
+                ))}
+                {!draft.fields.length && (
+                  <p>Add your first field using the controls on the left.</p>
+                )}
+              </div>
+            </div>
           )}
-        </aside>
+
+          {tab === "Live preview" && (
+            <form
+              className="form-sheet preview"
+              onSubmit={(event) => {
+                event.preventDefault();
+                setMessage("Preview validation passed. No test answers were saved.");
+              }}
+            >
+              <div className="eyebrow">CUSTOMER VIEW</div>
+              <h2>{draft.title}</h2>
+              <p>{draft.description}</p>
+
+              {draft.fields.map((field) => {
+                if (field.visibleWhen && !matches(field.visibleWhen)) return null;
+
+                const required =
+                  field.required ||
+                  Boolean(field.requiredWhen && matches(field.requiredWhen));
+
+                const setValue = (value: Value) =>
+                  setValues((current) => ({ ...current, [field.id]: value }));
+
+                return (
+                  <div className="preview-field" key={field.id}>
+                    <label htmlFor={field.id}>
+                      {field.label} {required && <span className="required">*</span>}
+                      {field.unit && <small> ({field.unit})</small>}
+                    </label>
+
+                    {field.type === "boolean" ? (
+                      <input
+                        id={field.id}
+                        type="checkbox"
+                        checked={values[field.id] === true}
+                        required={required}
+                        onChange={(e) => setValue(e.target.checked)}
+                      />
+                    ) : field.type === "textarea" ? (
+                      <textarea
+                        id={field.id}
+                        required={required}
+                        value={String(values[field.id] ?? "")}
+                        onChange={(e) => setValue(e.target.value)}
+                      />
+                    ) : field.type === "select" ? (
+                      <select
+                        id={field.id}
+                        required={required}
+                        value={String(values[field.id] ?? "")}
+                        onChange={(e) => setValue(e.target.value)}
+                      >
+                        <option value="">Choose an option</option>
+                        {field.options?.map((option) => (
+                          <option key={option} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        id={field.id}
+                        type={field.type}
+                        step={field.type === "number" ? "any" : undefined}
+                        min={field.min}
+                        max={field.max}
+                        required={required}
+                        value={String(values[field.id] ?? "")}
+                        onChange={(e) =>
+                          setValue(
+                            field.type === "number" && e.target.value !== ""
+                              ? Number(e.target.value)
+                              : e.target.value,
+                          )
+                        }
+                      />
+                    )}
+                    {field.type === "number" && (
+                      <small>
+                        Allowed range: {field.min ?? "No minimum"} – {field.max ?? "No maximum"}
+                      </small>
+                    )}
+                  </div>
+                );
+              })}
+              <button className="primary" type="submit">Validate preview</button>
+            </form>
+          )}
+
+          {tab === "Dependencies" && (
+            <div className="graph">
+              <ReactFlow
+                nodes={nodes}
+                edges={edges}
+                fitView
+                nodesDraggable={false}
+                nodesConnectable={false}
+                onNodeClick={(_event, node) => { setSelectedId(node.id); setContextId(node.id); }}
+              >
+                <Background />
+                <Controls />
+              </ReactFlow>
+            </div>
+          )}
+        </section>
+
+        <div className={`assistant-slot ${assistantOpen ? "is-open" : ""}`}>
+          <button type="button" className="assistant-toggle" aria-expanded={assistantOpen} onClick={() => setAssistantOpen(!assistantOpen)}><Sparkles size={16} />{assistantOpen ? "Hide assistant" : "Show assistant"}</button>
+          <div hidden={!assistantOpen}>
+            <RequirementsAssistant key={formId || "unsaved"} formId={formId} draft={draft} revision={revision} contextId={contextId}
+              onClearContext={() => setContextId("")}
+              onDependencies={(id) => { setSelectedId(id); setTab("Dependencies"); }}
+              onApply={(form, expectedRevision, expectedFingerprint) => {
+                if (expectedRevision !== revision || expectedFingerprint !== formFingerprint(draft) || busy) return false;
+                changeDraft(form);
+                return true;
+              }} />
+          </div>
+        </div>
       </main>
+      </fieldset>
     </div>
   );
 }

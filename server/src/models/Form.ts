@@ -41,6 +41,12 @@ const formSchema = new Schema(
   {
     title: { type: String, required: true, trim: true },
     description: { type: String, default: "" },
+    sourceDocumentId: {
+      type: Schema.Types.ObjectId,
+      ref: "CustomerDocument",
+      immutable: true,
+    },
+    revision: { type: Number, default: 1, min: 1 },
     status: {
       type: String,
       enum: ["draft"],

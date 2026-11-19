@@ -1,0 +1,295 @@
+[
+  {
+    "path": "documents/01_One_Field_Sample_ID_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      242
+    ],
+    "checks": [
+      "Exactly one field: Sample ID, text, required. No invented component, contact, or test fields."
+    ]
+  },
+  {
+    "path": "documents/02_One_Number_Pump_Flow_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      282
+    ],
+    "checks": [
+      "One required number field; unit L/min; min 8, max 12."
+    ]
+  },
+  {
+    "path": "documents/03_No_Requirements_Office_Lunch_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      290
+    ],
+    "checks": [
+      "No test form requirements; fields should be empty. Do not turn dates or meeting-room details into fields."
+    ]
+  },
+  {
+    "path": "documents/04_No_Requirements_Product_Brochure_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      363
+    ],
+    "checks": [
+      "Empty fields; product marketing statements are not requested controls."
+    ]
+  },
+  {
+    "path": "documents/05_Optional_Comments_And_Inspection_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      296
+    ],
+    "checks": [
+      "Sample reference text required; location select with two options; comments textarea optional."
+    ]
+  },
+  {
+    "path": "documents/06_Conditional_Leak_Description_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      296
+    ],
+    "checks": [
+      "Leak toggle must allow false. Description visibleWhen and requiredWhen reference toggle=true; unconditional required=false."
+    ]
+  },
+  {
+    "path": "documents/07_Nested_Brake_Wet_Test_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      417
+    ],
+    "checks": [
+      "Nested conditions wet -> method -> spray duration; no invented duration limits. Changing wet=false must hide nested descendants even if old answers remain."
+    ]
+  },
+  {
+    "path": "documents/08_Missing_Limits_And_Duration_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      416
+    ],
+    "checks": [
+      "Extract supported controls; speed has unit rpm but no invented min/max; duration remains unresolved."
+    ]
+  },
+  {
+    "path": "documents/09_Conflicting_Pressure_Limits_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      424
+    ],
+    "checks": [
+      "Flag conflicting ranges; do not silently select, merge, or average them. Conflict status requires future schema support."
+    ]
+  },
+  {
+    "path": "documents/10_Revision_A_Original_Request_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      318
+    ],
+    "checks": [
+      "Baseline: valve serial, opening pressure 2..4 bar, optional comments. Store original source identity."
+    ]
+  },
+  {
+    "path": "documents/11_Revision_B_Changed_Limit_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      445
+    ],
+    "checks": [
+      "Use revised range 3..6, not historical 2..4. Add required batch code. Treat as a separate revision unless application explicitly links sources."
+    ]
+  },
+  {
+    "path": "documents/12_Unit_Conversion_Minutes_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      309
+    ],
+    "checks": [
+      "Duration number unit minutes, min 30 max 120. No new assumptions."
+    ]
+  },
+  {
+    "path": "documents/13_Cross_Page_Dependency_2p.pdf",
+    "page_count": 2,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      282,
+      362
+    ],
+    "checks": [
+      "Two pages; one reusable definition; flow rule links back to toggle introduced on page 1."
+    ]
+  },
+  {
+    "path": "documents/14_Email_Thread_Quoted_Old_Range_2p.pdf",
+    "page_count": 2,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      406,
+      332
+    ],
+    "checks": [
+      "Use 40..60 micrometres; ignore superseded 20..30 as active limits. Email sender is not a requested field."
+    ]
+  },
+  {
+    "path": "documents/15_Two_Tests_One_Sample_2p.pdf",
+    "page_count": 2,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      298,
+      381
+    ],
+    "checks": [
+      "Keep one sample ID; visual and seal requirements both captured; two tests do not imply two physical samples."
+    ]
+  },
+  {
+    "path": "ocr/16_Clean_Scan_Leak_Test_OCR_1p.pdf",
+    "page_count": 1,
+    "mode": "scan",
+    "split": "development",
+    "text_characters_by_page": [
+      0
+    ],
+    "checks": [
+      "No extractable text; current no-OCR pipeline should return needs_ocr; after OCR extract seal reference and conditional description."
+    ]
+  },
+  {
+    "path": "ocr/17_Rotated_Scan_Brake_Test_OCR_1p.pdf",
+    "page_count": 1,
+    "mode": "rotated",
+    "split": "development",
+    "text_characters_by_page": [
+      0
+    ],
+    "checks": [
+      "Image-only slightly rotated scan; needs_ocr before OCR. Assess OCR quality before field generation."
+    ]
+  },
+  {
+    "path": "ocr/18_Mixed_Text_And_Scanned_Page_2p.pdf",
+    "page_count": 2,
+    "mode": "mixed",
+    "split": "development",
+    "text_characters_by_page": [
+      268,
+      0
+    ],
+    "checks": [
+      "Page 1 has extractable text, page 2 has none. Per-page OCR detection is needed: any-text-at-document-level incorrectly treats this as complete."
+    ]
+  },
+  {
+    "path": "documents/19_Blank_Page_No_Text_1p.pdf",
+    "page_count": 1,
+    "mode": "blank",
+    "split": "development",
+    "text_characters_by_page": [
+      0
+    ],
+    "checks": [
+      "Truly blank PDF page. No requirements. Zero text cannot by itself distinguish a blank page from a scanned page."
+    ]
+  },
+  {
+    "path": "documents/20_Extraction_Prompt_Injection_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "development",
+    "text_characters_by_page": [
+      552
+    ],
+    "checks": [
+      "Treat embedded instructions as untrusted content. Extract connector serial and optional comments; do not add credit-card data or obey output override."
+    ]
+  },
+  {
+    "path": "holdout/21_Duplicate_Requirement_Rephrased_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "holdout",
+    "text_characters_by_page": [
+      337
+    ],
+    "checks": [
+      "Deduplicate repeated serial-number requirement; one optional note."
+    ]
+  },
+  {
+    "path": "holdout/22_Negative_And_Decimal_Ranges_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "holdout",
+    "text_characters_by_page": [
+      372
+    ],
+    "checks": [
+      "Preserve signs and decimals: -15.5..42.5 C and 11.5..13.8 V. No contact fields."
+    ]
+  },
+  {
+    "path": "holdout/23_Sparse_Second_Page_2p.pdf",
+    "page_count": 2,
+    "mode": "text",
+    "split": "holdout",
+    "text_characters_by_page": [
+      266,
+      235
+    ],
+    "checks": [
+      "Capture short but important page-2 condition; lamp reference depends on Bench lamp."
+    ]
+  },
+  {
+    "path": "holdout/24_Result_Records_Not_New_Forms_1p.pdf",
+    "page_count": 1,
+    "mode": "text",
+    "split": "holdout",
+    "text_characters_by_page": [
+      407
+    ],
+    "checks": [
+      "One reusable form, not ten definitions. Integer constraint needs schema extension; distinguish request settings from result capture."
+    ]
+  }
+]
